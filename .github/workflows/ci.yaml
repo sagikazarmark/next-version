@@ -1,0 +1,162 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # macos runs pick.sh with the bash on the runner's PATH.
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Test pick.sh
+        run: ./pick_test.sh
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # semver is vendored unmodified, so not ours to lint.
+      - name: ShellCheck
+        run: shellcheck pick.sh pick_test.sh
+
+  action:
+    name: Action
+    runs-on: ubuntu-latest
+
+    # The action against actions/checkout's tags: 60-odd of them over several pages, v1.0.0 the
+    # oldest vX.Y.Z. The checks hold as it releases more.
+    env:
+      REPOSITORY: actions/checkout
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Bump this repository
+        id: own
+        uses: ./
+
+      - name: Bump major
+        id: major
+        uses: ./
+        with:
+          repository: ${{ env.REPOSITORY }}
+          bump: major
+
+      - name: Exact, newer
+        id: newer
+        uses: ./
+        with:
+          repository: ${{ env.REPOSITORY }}
+          version: v999.0.0
+
+      - name: Exact, older, require-newer off
+        id: older
+        uses: ./
+        with:
+          repository: ${{ env.REPOSITORY }}
+          version: v0.9.0
+          require-newer: false
+
+      - name: Prerelease
+        id: prerelease
+        uses: ./
+        with:
+          repository: ${{ env.REPOSITORY }}
+          version: v999.0.0-rc.1
+          allow-prerelease: true
+
+      - name: Exact, existing (fails)
+        id: existing
+        continue-on-error: true
+        uses: ./
+        with:
+          repository: ${{ env.REPOSITORY }}
+          version: v1.0.0
+
+      - name: Exact, older (fails)
+        id: older-required
+        continue-on-error: true
+        uses: ./
+        with:
+          repository: ${{ env.REPOSITORY }}
+          version: v0.9.0
+
+      - name: Check the outputs
+        env:
+          OWN: ${{ steps.own.outputs.version }}
+          LATEST: ${{ steps.major.outputs.latest }}
+          MAJOR: ${{ steps.major.outputs.version }}
+          MAJOR_MAKE_LATEST: ${{ steps.major.outputs.make-latest }}
+          NEWER_PREVIOUS: ${{ steps.newer.outputs.previous }}
+          NEWER_MAKE_LATEST: ${{ steps.newer.outputs.make-latest }}
+          OLDER: ${{ steps.older.outputs.version }}
+          OLDER_MAKE_LATEST: ${{ steps.older.outputs.make-latest }}
+          OLDER_PREVIOUS: ${{ steps.older.outputs.previous }}
+          PRERELEASE: ${{ steps.prerelease.outputs.prerelease }}
+          PRERELEASE_MAKE_LATEST: ${{ steps.prerelease.outputs.make-latest }}
+          EXISTING: ${{ steps.existing.outcome }}
+          OLDER_REQUIRED: ${{ steps.older-required.outcome }}
+        run: |
+          failed=0
+          # check NAME GOT WANT
+          check() {
+            if [[ "$2" == "$3" ]]; then
+              echo "ok   $1: $2"
+            else
+              echo "FAIL $1: got '$2', want '$3'"
+              failed=1
+            fi
+          }
+          # release NAME GOT: GOT is vX.Y.Z, not v0.0.0
+          release() {
+            if [[ "$2" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ && "$2" != v0.0.0 ]]; then
+              echo "ok   $1: $2"
+            else
+              echo "FAIL $1: got '$2', want vX.Y.Z"
+              failed=1
+            fi
+          }
+
+          release "own version" "$OWN"
+          release "latest" "$LATEST"
+
+          major="${LATEST#v}"
+          check "major" "$MAJOR" "v$((${major%%.*} + 1)).0.0"
+          check "major make-latest" "$MAJOR_MAKE_LATEST" true
+          check "newer previous" "$NEWER_PREVIOUS" "$LATEST"
+          check "newer make-latest" "$NEWER_MAKE_LATEST" true
+          check "older" "$OLDER" v0.9.0
+          check "older make-latest" "$OLDER_MAKE_LATEST" false
+          check "older previous" "$OLDER_PREVIOUS" ""
+          check "prerelease" "$PRERELEASE" true
+          check "prerelease make-latest" "$PRERELEASE_MAKE_LATEST" false
+          check "existing" "$EXISTING" failure
+          check "older, require-newer on" "$OLDER_REQUIRED" failure
+
+          exit "$failed"
