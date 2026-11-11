@@ -107,11 +107,21 @@ jobs:
           repository: ${{ env.REPOSITORY }}
           version: v0.9.0
 
+      # Without a prefix, only actions/checkout's tags without a v count (it has one, 1.0.0).
+      - name: Empty tag prefix
+        id: no-prefix
+        uses: ./
+        with:
+          repository: ${{ env.REPOSITORY }}
+          bump: minor
+          tag-prefix: ""
+
       - name: Check the outputs
         env:
-          OWN: ${{ steps.own.outputs.version }}
+          OWN: ${{ steps.own.outputs.tag }}
           LATEST: ${{ steps.major.outputs.latest }}
           MAJOR: ${{ steps.major.outputs.version }}
+          MAJOR_TAG: ${{ steps.major.outputs.tag }}
           MAJOR_MAKE_LATEST: ${{ steps.major.outputs.make-latest }}
           NEWER_PREVIOUS: ${{ steps.newer.outputs.previous }}
           NEWER_MAKE_LATEST: ${{ steps.newer.outputs.make-latest }}
@@ -122,6 +132,9 @@ jobs:
           PRERELEASE_MAKE_LATEST: ${{ steps.prerelease.outputs.make-latest }}
           EXISTING: ${{ steps.existing.outcome }}
           OLDER_REQUIRED: ${{ steps.older-required.outcome }}
+          NO_PREFIX: ${{ steps.no-prefix.outputs.version }}
+          NO_PREFIX_TAG: ${{ steps.no-prefix.outputs.tag }}
+          NO_PREFIX_LATEST: ${{ steps.no-prefix.outputs.latest }}
         run: |
           failed=0
           # check NAME GOT WANT
@@ -143,20 +156,30 @@ jobs:
             fi
           }
 
-          release "own version" "$OWN"
+          release "own tag" "$OWN"
           release "latest" "$LATEST"
 
           major="${LATEST#v}"
-          check "major" "$MAJOR" "v$((${major%%.*} + 1)).0.0"
+          check "major" "$MAJOR" "$((${major%%.*} + 1)).0.0"
+          check "major tag" "$MAJOR_TAG" "v$MAJOR"
           check "major make-latest" "$MAJOR_MAKE_LATEST" true
           check "newer previous" "$NEWER_PREVIOUS" "$LATEST"
           check "newer make-latest" "$NEWER_MAKE_LATEST" true
-          check "older" "$OLDER" v0.9.0
+          check "older" "$OLDER" 0.9.0
           check "older make-latest" "$OLDER_MAKE_LATEST" false
           check "older previous" "$OLDER_PREVIOUS" ""
           check "prerelease" "$PRERELEASE" true
           check "prerelease make-latest" "$PRERELEASE_MAKE_LATEST" false
           check "existing" "$EXISTING" failure
           check "older, require-newer on" "$OLDER_REQUIRED" failure
+          check "no prefix tag" "$NO_PREFIX_TAG" "$NO_PREFIX"
+          if [[ "$NO_PREFIX_LATEST" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "ok   no prefix latest: $NO_PREFIX_LATEST"
+            IFS=. read -r no_prefix_major no_prefix_minor _ <<< "$NO_PREFIX_LATEST"
+            check "no prefix" "$NO_PREFIX" "$no_prefix_major.$((no_prefix_minor + 1)).0"
+          else
+            echo "FAIL no prefix latest: got '$NO_PREFIX_LATEST', want X.Y.Z"
+            failed=1
+          fi
 
           exit "$failed"
