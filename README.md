@@ -17,7 +17,7 @@ on:
         options: [patch, minor, major]
         default: patch
       version:
-        description: Exact version, vX.Y.Z (overrides bump)
+        description: Exact version, X.Y.Z (overrides bump)
         type: string
 
 jobs:
@@ -38,12 +38,16 @@ jobs:
       - name: Release
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.version.outputs.version }}
-        run: gh release create "$VERSION" --repo "$GITHUB_REPOSITORY" --generate-notes
+          TAG: ${{ steps.version.outputs.tag }}
+        run: gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --generate-notes
 ```
 
-The first release counts from `v0.0.0`, so `patch` gives `v0.0.1`. Pass `version: v0.1.0` (or any
-other) to start elsewhere.
+The `version` output is the version alone (`1.2.3`), for a manifest or a package registry; the
+`tag` output is its tag (`v1.2.3`).
+
+The first release counts from `0.0.0`, so `patch` gives `0.0.1`. Pass `version: 0.1.0` (or any
+other) to start elsewhere. An exact version may have the tag prefix or not: `v0.1.0` and `0.1.0` are
+the same version.
 
 ### Which tags count
 
@@ -52,6 +56,24 @@ prerelease or build part. The latest release is the highest of them by
 [semantic versioning](https://semver.org), not the most recent or the last alphabetically.
 Prerelease tags (`v1.0.0-rc.1`) never count as the latest, and other tags are ignored. Every tag,
 of whatever form, counts when checking that the version does not exist yet.
+
+### Another tag prefix
+
+`tag-prefix` is what comes before the version in a tag, `v` by default. Set it for the tags of one
+package in a repository that releases several (`name-vX.Y.Z`), or to empty for tags without a
+prefix (`X.Y.Z`):
+
+```yaml
+- uses: sagikazarmark/next-version@v1
+  id: version
+  with:
+    bump: minor
+    tag-prefix: name-v
+```
+
+Only tags with the prefix count: with `name-v`, `name-v1.2.0` is version `1.2.0`, while `v1.3.0`
+and `other-v1.4.0` are ignored. The prefix is literal text, not a pattern. The `tag`, `latest` and
+`previous` outputs carry it; `version` does not.
 
 ### Release an older version
 
@@ -70,11 +92,11 @@ It still must not exist. Publish it without marking it the Latest release, so th
 the latest release stay on `v1.5.0`, and start its release notes at the version before it:
 
 ```sh
-gh release create "$VERSION" --latest="$MAKE_LATEST" --notes-start-tag "$PREVIOUS" --generate-notes
+gh release create "$TAG" --latest="$MAKE_LATEST" --notes-start-tag "$PREVIOUS" --generate-notes
 ```
 
-with `MAKE_LATEST` and `PREVIOUS` set from the `make-latest` and `previous` outputs. `previous` is
-empty when there is no older version; drop `--notes-start-tag` then.
+with `TAG`, `MAKE_LATEST` and `PREVIOUS` set from the `tag`, `make-latest` and `previous` outputs.
+`previous` is empty when there is no older version; drop `--notes-start-tag` then.
 
 ### Release a prerelease
 
@@ -99,8 +121,9 @@ while those for `v2.0.0` start at the release before it.
 | Name | Description | Default |
 | --- | --- | --- |
 | `bump` | `patch`, `minor` or `major`. Ignored when `version` is set. | `patch` |
-| `version` | Exact version, `vX.Y.Z` (or `vX.Y.Z-PRERELEASE` with `allow-prerelease`). Overrides `bump`. | `""` |
-| `require-newer` | Require the version to be newer than the latest `vX.Y.Z` tag. | `true` |
+| `version` | Exact version, `X.Y.Z` (or `X.Y.Z-PRERELEASE` with `allow-prerelease`), with or without the tag prefix. Overrides `bump`. | `""` |
+| `tag-prefix` | What comes before the version in a tag. Only tags with it count. Empty for tags without a prefix. | `v` |
+| `require-newer` | Require the version to be newer than the latest release tag. | `true` |
 | `allow-prerelease` | Allow an exact version with a prerelease part. | `false` |
 | `repository` | The repository whose tags to read, `owner/name`. | The current repository |
 | `token` | Token for reading the tags. | `github.token` |
@@ -109,16 +132,18 @@ while those for `v2.0.0` start at the release before it.
 
 | Name | Description |
 | --- | --- |
-| `version` | The version. |
-| `latest` | The latest `vX.Y.Z` tag, or `v0.0.0` without one. |
-| `make-latest` | `true` when the version is a release newer than every `vX.Y.Z` tag, so it should be marked the Latest release (`gh release create --latest`, the API's `make_latest`). |
+| `version` | The version, without the tag prefix: `1.2.3`. |
+| `tag` | The version's tag, the tag prefix followed by the version: `v1.2.3`. |
+| `latest` | The latest release tag, or the tag of `0.0.0` (`v0.0.0`) without one. |
+| `make-latest` | `true` when the version is a release newer than every release tag, so it should be marked the Latest release (`gh release create --latest`, the API's `make_latest`). |
 | `prerelease` | `true` when the version has a prerelease part. |
-| `previous` | Where its release notes start: the highest tag below the version (only `vX.Y.Z` tags for a release, prereleases too for a prerelease). Empty without one. |
+| `previous` | The tag its release notes start at: the highest tag below the version (only release tags for a release, prereleases too for a prerelease). Empty without one. |
 
 ## Run it locally
 
 `pick.sh` reads the tags from stdin, one per line, and takes the inputs as environment variables
-(`BUMP`, `VERSION`, `REQUIRE_NEWER`, `ALLOW_PRERELEASE`):
+(`BUMP`, `VERSION`, `TAG_PREFIX`, `REQUIRE_NEWER`, `ALLOW_PRERELEASE`). `TAG_PREFIX` is `v` when
+unset; set it to empty for tags without a prefix:
 
 ```sh
 git tag --list | BUMP=minor ./pick.sh
