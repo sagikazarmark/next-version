@@ -107,7 +107,7 @@ jobs:
           repository: ${{ env.REPOSITORY }}
           version: v0.9.0
 
-      # actions/checkout has only v-prefixed tags: without a prefix, none counts.
+      # Without a prefix, only actions/checkout's tags without a v count (it has one, 1.0.0).
       - name: Empty tag prefix
         id: no-prefix
         uses: ./
@@ -172,8 +172,14 @@ jobs:
           check "prerelease make-latest" "$PRERELEASE_MAKE_LATEST" false
           check "existing" "$EXISTING" failure
           check "older, require-newer on" "$OLDER_REQUIRED" failure
-          check "no prefix" "$NO_PREFIX" 0.1.0
-          check "no prefix tag" "$NO_PREFIX_TAG" 0.1.0
-          check "no prefix latest" "$NO_PREFIX_LATEST" 0.0.0
+          check "no prefix tag" "$NO_PREFIX_TAG" "$NO_PREFIX"
+          if [[ "$NO_PREFIX_LATEST" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "ok   no prefix latest: $NO_PREFIX_LATEST"
+            IFS=. read -r no_prefix_major no_prefix_minor _ <<< "$NO_PREFIX_LATEST"
+            check "no prefix" "$NO_PREFIX" "$no_prefix_major.$((no_prefix_minor + 1)).0"
+          else
+            echo "FAIL no prefix latest: got '$NO_PREFIX_LATEST', want X.Y.Z"
+            failed=1
+          fi
 
           exit "$failed"
