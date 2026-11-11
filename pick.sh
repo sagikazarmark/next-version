@@ -84,7 +84,13 @@ else
 fi
 
 if [[ -n "${VERSION:-}" ]]; then
-  next="${VERSION#"$prefix"}"
+  # A version as it is stays one: with a prefix that ends in a digit (1), stripping it would turn
+  # 11.2.3 into 1.2.3.
+  if is_version "$VERSION"; then
+    next="$VERSION"
+  else
+    next="${VERSION#"$prefix"}"
+  fi
   if is_release "$next"; then
     prerelease=false
   elif [[ $allow_prerelease == true ]] && is_version "$next"; then

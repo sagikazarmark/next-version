@@ -47,7 +47,8 @@ The `version` output is the version alone (`1.2.3`), for a manifest or a package
 
 The first release counts from `0.0.0`, so `patch` gives `0.0.1`. Pass `version: 0.1.0` (or any
 other) to start elsewhere. An exact version may have the tag prefix or not: `v0.1.0` and `0.1.0` are
-the same version.
+the same version. A version as it is never loses a prefix, so with a prefix that ends in a digit,
+say `1`, `11.2.3` is version `11.2.3`, not `1.2.3`.
 
 ### Which tags count
 

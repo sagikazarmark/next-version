@@ -151,6 +151,12 @@ ok "empty prefix" "1.0.0 v2.0.0 1.1.0-rc.1" "version=1.0.1 tag=1.0.1 latest=1.0.
 ok "empty prefix, first release" "v1.0.0" "version=0.1.0 tag=0.1.0 latest=0.0.0 previous=" \
   BUMP=minor TAG_PREFIX=
 fails "empty prefix, a v" "1.0.0" "version must be X.Y.Z (without a tag prefix;" VERSION=v1.0.1 TAG_PREFIX=
+ok "prefix ending in a digit, version as it is" "11.0.0" "version=1.2.3 tag=11.2.3 latest=11.0.0" \
+  VERSION=1.2.3 TAG_PREFIX=1 REQUIRE_NEWER=false
+ok "prefix ending in a digit, a version is never stripped" "" "version=11.2.3 tag=111.2.3" \
+  VERSION=11.2.3 TAG_PREFIX=1
+ok "prefix ending in a digit, with the prefix" "x11.0.0" "version=1.2.3 tag=x11.2.3 latest=x11.0.0" \
+  VERSION=x11.2.3 TAG_PREFIX=x1
 
 # Flags
 fails "REQUIRE_NEWER not a boolean" "$tags" "require-newer (REQUIRE_NEWER) must be true or false" \
