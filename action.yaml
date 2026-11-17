@@ -2,20 +2,22 @@
 # Apache-2.0, vendored unmodified as ./semver; see README.md).
 name: next-version
 description: >-
-  Pick the next version from the repository's tags: bump the latest vX.Y.Z tag (or another tag
-  prefix's) by patch, minor or major, or check an exact version. Fails if the version is already a
+  Pick the next version from the repository's tags: check an exact version, or bump the latest
+  vX.Y.Z tag (or another tag prefix's) by patch, minor or major. Fails if the version is already a
   tag, if it is not newer than the latest (unless require-newer is false), or if it is a prerelease
   (unless allow-prerelease).
 
 inputs:
   bump:
-    description: patch, minor or major; ignored when version is set
+    description: >-
+      version to release the exact version input, which it requires; patch, minor or major to bump
+      the latest release tag, with the version input empty
     required: false
-    default: patch
+    default: version
   version:
     description: >-
       Exact version, X.Y.Z (or X.Y.Z-PRERELEASE with allow-prerelease), with or without the tag
-      prefix; overrides bump
+      prefix; only with bump version
     required: false
     default: ""
   tag-prefix:

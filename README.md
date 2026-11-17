@@ -1,8 +1,8 @@
 # next-version
 
-GitHub Action that picks the next version from a repository's tags. It bumps the latest `vX.Y.Z`
-tag by `patch`, `minor` or `major`, or checks an exact version you pass. It refuses a version that
-is already a tag, and by default one that is not newer than the latest.
+GitHub Action that picks the next version from a repository's tags. It checks an exact version you
+pass, or bumps the latest `vX.Y.Z` tag by `patch`, `minor` or `major`. It refuses a version that is
+already a tag, and by default one that is not newer than the latest.
 
 It reads the tags through the GitHub API, so it needs no checkout and no `fetch-depth: 0`.
 
@@ -13,11 +13,12 @@ on:
   workflow_dispatch:
     inputs:
       bump:
+        description: Bump the latest version, or release the exact version below (version)
         type: choice
-        options: [patch, minor, major]
-        default: patch
+        options: [version, patch, minor, major]
+        default: version
       version:
-        description: Exact version, X.Y.Z (overrides bump)
+        description: Exact version to release, X.Y.Z (only with bump version)
         type: string
 
 jobs:
@@ -44,6 +45,12 @@ jobs:
 
 The `version` output is the version alone (`1.2.3`), for a manifest or a package registry; the
 `tag` output is its tag (`v1.2.3`).
+
+`bump` says how to pick the version, and nothing is picked unless you say so:
+
+- `version` (the default) releases the exact `version` input, which it then requires.
+- `patch`, `minor` or `major` bumps the latest release tag. `version` must be empty then: a version
+  left in the form fails instead of silently winning over the bump.
 
 The first release counts from `0.0.0`, so `patch` gives `0.0.1`. Pass `version: 0.1.0` (or any
 other) to start elsewhere. An exact version may have the tag prefix or not: `v0.1.0` and `0.1.0` are
@@ -121,8 +128,8 @@ while those for `v2.0.0` start at the release before it.
 
 | Name | Description | Default |
 | --- | --- | --- |
-| `bump` | `patch`, `minor` or `major`. Ignored when `version` is set. | `patch` |
-| `version` | Exact version, `X.Y.Z` (or `X.Y.Z-PRERELEASE` with `allow-prerelease`), with or without the tag prefix. Overrides `bump`. | `""` |
+| `bump` | `version` to release the exact `version`, which it requires; `patch`, `minor` or `major` to bump the latest release tag, with `version` empty. | `version` |
+| `version` | Exact version, `X.Y.Z` (or `X.Y.Z-PRERELEASE` with `allow-prerelease`), with or without the tag prefix. Only with `bump: version`. | `""` |
 | `tag-prefix` | What comes before the version in a tag. Only tags with it count. Empty for tags without a prefix. | `v` |
 | `require-newer` | Require the version to be newer than the latest release tag. | `true` |
 | `allow-prerelease` | Allow an exact version with a prerelease part. | `false` |
@@ -143,8 +150,8 @@ while those for `v2.0.0` start at the release before it.
 ## Run it locally
 
 `pick.sh` reads the tags from stdin, one per line, and takes the inputs as environment variables
-(`BUMP`, `VERSION`, `TAG_PREFIX`, `REQUIRE_NEWER`, `ALLOW_PRERELEASE`). `TAG_PREFIX` is `v` when
-unset; set it to empty for tags without a prefix:
+(`BUMP`, `VERSION`, `TAG_PREFIX`, `REQUIRE_NEWER`, `ALLOW_PRERELEASE`). `BUMP` is `version` when
+unset or empty. `TAG_PREFIX` is `v` when unset; set it to empty for tags without a prefix:
 
 ```sh
 git tag --list | BUMP=minor ./pick.sh

@@ -60,6 +60,8 @@ jobs:
       - name: Bump this repository
         id: own
         uses: ./
+        with:
+          bump: patch
 
       - name: Bump major
         id: major
@@ -107,6 +109,22 @@ jobs:
           repository: ${{ env.REPOSITORY }}
           version: v0.9.0
 
+      - name: Bump with a version (fails)
+        id: bump-with-version
+        continue-on-error: true
+        uses: ./
+        with:
+          repository: ${{ env.REPOSITORY }}
+          bump: patch
+          version: v999.0.0
+
+      - name: No inputs (fails)
+        id: no-inputs
+        continue-on-error: true
+        uses: ./
+        with:
+          repository: ${{ env.REPOSITORY }}
+
       # Without a prefix, only actions/checkout's tags without a v count (it has one, 1.0.0).
       - name: Empty tag prefix
         id: no-prefix
@@ -132,6 +150,8 @@ jobs:
           PRERELEASE_MAKE_LATEST: ${{ steps.prerelease.outputs.make-latest }}
           EXISTING: ${{ steps.existing.outcome }}
           OLDER_REQUIRED: ${{ steps.older-required.outcome }}
+          BUMP_WITH_VERSION: ${{ steps.bump-with-version.outcome }}
+          NO_INPUTS: ${{ steps.no-inputs.outcome }}
           NO_PREFIX: ${{ steps.no-prefix.outputs.version }}
           NO_PREFIX_TAG: ${{ steps.no-prefix.outputs.tag }}
           NO_PREFIX_LATEST: ${{ steps.no-prefix.outputs.latest }}
@@ -172,6 +192,8 @@ jobs:
           check "prerelease make-latest" "$PRERELEASE_MAKE_LATEST" false
           check "existing" "$EXISTING" failure
           check "older, require-newer on" "$OLDER_REQUIRED" failure
+          check "bump with a version" "$BUMP_WITH_VERSION" failure
+          check "no inputs" "$NO_INPUTS" failure
           check "no prefix tag" "$NO_PREFIX_TAG" "$NO_PREFIX"
           if [[ "$NO_PREFIX_LATEST" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "ok   no prefix latest: $NO_PREFIX_LATEST"
