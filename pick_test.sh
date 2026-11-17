@@ -78,9 +78,19 @@ ok "patch from the semver-latest tag" "$tags" \
   "version=0.10.1 tag=v0.10.1 latest=v0.10.0 make-latest=true prerelease=false previous=v0.10.0" BUMP=patch
 ok "minor" "$tags" "version=0.11.0 tag=v0.11.0 latest=v0.10.0" BUMP=minor
 ok "major ignores prereleases" "$tags" "version=1.0.0 tag=v1.0.0 latest=v0.10.0 previous=v0.10.0" BUMP=major
-ok "version overrides bump" "$tags" "version=0.12.0 tag=v0.12.0" BUMP=major VERSION=v0.12.0
-fails "unknown bump" "$tags" "bump must be patch, minor or major" BUMP=huge
-fails "no bump and no version" "$tags" "bump must be patch, minor or major"
+fails "unknown bump" "$tags" "bump must be version, patch, minor or major, got: huge" BUMP=huge
+for bump in patch minor major; do
+  fails "$bump with a version" "$tags" \
+    "version (VERSION) is only for bump version, got bump $bump and version v0.12.0" \
+    "BUMP=$bump" VERSION=v0.12.0
+done
+
+# Bump version, the default: the exact version, which it requires.
+ok "bump version" "$tags" "version=0.12.0 tag=v0.12.0" BUMP=version VERSION=v0.12.0
+ok "bump empty is version" "$tags" "version=0.12.0 tag=v0.12.0" BUMP= VERSION=v0.12.0
+fails "bump version without a version" "$tags" "version (VERSION) is required with bump version" \
+  BUMP=version
+fails "no bump and no version" "$tags" "version (VERSION) is required with bump version"
 
 # Exact versions
 ok "first release, exact" "" "version=0.1.0 tag=v0.1.0 make-latest=true previous=" VERSION=v0.1.0

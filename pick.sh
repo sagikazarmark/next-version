@@ -6,10 +6,10 @@
 # A version's tag is TAG_PREFIX followed by the version: vX.Y.Z by default. Set TAG_PREFIX to
 # another prefix (say, name-v), or to empty for tags without one.
 #
-# VERSION, if set, is the version: X.Y.Z, or X.Y.Z-PRERELEASE when ALLOW_PRERELEASE is true, with
-# or without the tag prefix. Otherwise BUMP (patch, minor or major) bumps the latest release tag,
-# or 0.0.0 without one. Prerelease tags never count as the latest, and tags that are not a version
-# after the tag prefix are ignored.
+# BUMP picks how: version (the default) releases VERSION, which it requires: X.Y.Z, or
+# X.Y.Z-PRERELEASE when ALLOW_PRERELEASE is true, with or without the tag prefix. patch, minor or
+# major bumps the latest release tag, or 0.0.0 without one, and refuses a VERSION. Prerelease tags
+# never count as the latest, and tags that are not a version after the tag prefix are ignored.
 #
 # Fails if the version's tag exists already, and, unless REQUIRE_NEWER is false, if it is not newer
 # than the latest (turn it off for a patch to an older minor version, say).
@@ -83,7 +83,28 @@ else
   forms="without a tag prefix"
 fi
 
-if [[ -n "${VERSION:-}" ]]; then
+bump="${BUMP:-version}"
+
+case "$bump" in
+  version)
+    if [[ -z "${VERSION:-}" ]]; then
+      echo "::error::version (VERSION) is required with bump version, the default; set it, or set bump (BUMP) to patch, minor or major" >&2
+      exit 1
+    fi
+    ;;
+  patch | minor | major)
+    if [[ -n "${VERSION:-}" ]]; then
+      echo "::error::version (VERSION) is only for bump version, got bump $bump and version $VERSION; set bump (BUMP) to version, or leave version empty" >&2
+      exit 1
+    fi
+    ;;
+  *)
+    echo "::error::bump must be version, patch, minor or major, got: $bump" >&2
+    exit 1
+    ;;
+esac
+
+if [[ $bump == version ]]; then
   # A version as it is stays one: with a prefix that ends in a digit (1), stripping it would turn
   # 11.2.3 into 1.2.3.
   if is_version "$VERSION"; then
@@ -103,13 +124,7 @@ if [[ -n "${VERSION:-}" ]]; then
     exit 1
   fi
 else
-  case "${BUMP:-}" in
-    patch | minor | major) next="$("$semver" bump "$BUMP" "$latest")" ;;
-    *)
-      echo "::error::bump must be patch, minor or major, got: ${BUMP:-}" >&2
-      exit 1
-      ;;
-  esac
+  next="$("$semver" bump "$bump" "$latest")"
   prerelease=false
 fi
 
